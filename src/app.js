@@ -2,10 +2,11 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const { graphqlHTTP } = require("express-graphql");
 const { buildSchema } = require("graphql");
+const mongoose = require("mongoose");
+
+const Event = require("./mdoels/events");
 
 const app = express();
-
-const event = [];
 
 app.use(bodyParser.json());
 
@@ -41,23 +42,54 @@ app.use("/graphql", graphqlHTTP({ // 1
   `),
   rootValue: {
     events: () => {
-      return events;
+      Event
+        .find()
+        .then(events => {
+          return events.map(event => {
+            return { ...event.doc, _id: event.doc.id.toString() };
+          });
+        })
+        .catch(e => { throw e; })
     },
     createEvent: (args) => {
-      const event = {
-        _id: Math.random().toString(),
+      const event = new Event({
         title: args.eventInput.title,
         description: args.eventInput.description,
         price: +args.eventInput.price,
-        date: args.eventInput.date
-      }
-      console.log(event);
+        date: new Date(args.eventInput.date)
+      });
       return event
+        .save()
+        .then(result => {
+          console.log(result);
+          return { ...result.doc, _id: result.doc._id.toString() };
+        })
+        .catch(e => {
+          console.log(e);
+          throw e;
+      });
     }
   },
   graphiql: true
 }));
 
-app.listen(3000, () => {
-  console.log("Server is running on 3000");
-});
+mongoose
+  .connect(
+  `mongodb+srv://
+          ${process.env.MONGO_USER}:
+          ${process.env.MONGO_PASSWORD}
+          @cluster0-ntrwp.mongodb.net/${process.env.MONGO_DB}?retryWrites=true`
+  )
+  .then(() => {
+    app.listen(3000, () => {
+      console.log("Server is running on 3000");
+    });
+  })
+  .catch(e => {
+    console.log(e);
+  });
+
+
+// app.listen(3000, () => {
+//   console.log("Server is running on 3000");
+// });
